@@ -182,7 +182,9 @@ def get_mbed_dirs_data(src_dir, ignore_dirs=[]):
             istoolchaindir = d.startswith(
                 "TOOLCHAIN_") and d[10:] not in mbed_labels['TOOLCHAIN']
             if ((istargetdir or istoolchaindir) or
-                    (d.upper() == "TESTS") or (d.startswith(".")) or d in ignore_dirs):
+                    ("TEST" in d.upper()) or (d.startswith(".")) or
+                    ("apps" in d.lower()) or ("doc" in d.lower()) or
+                    (d in ignore_dirs)):
                 dirs.remove(d)
             else:
                 target_dirs.append(join(root, d))
@@ -338,7 +340,8 @@ mbed_libs = [
     join(FRAMEWORK_DIR, "rtos"),
     join(FRAMEWORK_DIR, "events"),
     join(FRAMEWORK_DIR, "features", "filesystem"),
-    join(FRAMEWORK_DIR, "features", "unsupported", "net"),
+    join(FRAMEWORK_DIR, "features", "FEATURE_LWIP", "lwip-interface"),
+    join(FRAMEWORK_DIR, "features", "netsocket"),
     join(FRAMEWORK_DIR, "features", "unsupported", "rpc"),
     join(FRAMEWORK_DIR, "features", "unsupported", "dsp"),
     join(FRAMEWORK_DIR, "features", "unsupported", "USBHost"),
@@ -365,11 +368,19 @@ for lib_path in mbed_libs:
         if basename(lib_path) == "net" and "cellular" in d:
             continue
         rel_path = relpath(d, lib_path).replace("\\", "/")
-        lib_manifest['build']['flags'].append("-I %s" % rel_path)
+        lib_manifest['build']['flags'].extend(
+            ["-I%s" % join(FRAMEWORK_DIR, "features").replace("\\", "/"), "-I %s" % rel_path])
         lib_manifest['build']['srcFilter'].extend([
             "+<%s/*.c*>" % rel_path,
             "+<%s/*.[sS]>" % rel_path
         ])
+
+    # Handle an unusal dependency on mbed-rtos library
+    if basename(lib_path) == "netsocket":
+        os_dirs = get_mbed_dirs_data(join(FRAMEWORK_DIR, "rtos"))
+        os_includes = os_dirs.get("inc_dirs") + os_dirs.get("src_dirs")
+        lib_manifest['build']['flags'].extend(
+            ["-I%s" % d.replace("\\", "/") for d in os_includes])
 
     env.Append(
         EXTRA_LIB_BUILDERS=[PlatformIOLibBuilder(env, lib_path, lib_manifest)])
