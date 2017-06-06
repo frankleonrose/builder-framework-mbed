@@ -356,7 +356,8 @@ for lib_path in mbed_libs:
         "name": "mbed-" + basename(lib_path),
         "build": {
             "flags": [],
-            "srcFilter": []
+            "srcFilter": [],
+            "libArchive": False
         }
     }
 
