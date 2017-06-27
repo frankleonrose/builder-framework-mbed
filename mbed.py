@@ -96,7 +96,17 @@ def parse_eix_file(filename):
         ("CPPPATH", "./Target/Compiler/Includepaths/Includepath")
     )
 
-    tree = ElementTree.parse(filename)
+    content = ""
+    with open(filename, "r") as fp:
+        for line in fp.readlines():
+            # Fix broken XML entry
+            if "\"\"" in line and line.strip().startswith("<Symbol name"):
+                line = line.replace("\"\"", "\"'")
+                line = line.replace("\"", "'", 1)
+                line = line.replace("\"", "\\\"")
+            content += line
+
+    tree = ElementTree.fromstring(content)
 
     for (key, path) in paths:
         if key not in result:
@@ -182,7 +192,9 @@ def get_mbed_dirs_data(src_dir, ignore_dirs=[]):
             istoolchaindir = d.startswith(
                 "TOOLCHAIN_") and d[10:] not in mbed_labels['TOOLCHAIN']
             if ((istargetdir or istoolchaindir) or
-                    (d.upper() == "TESTS") or (d.startswith(".")) or d in ignore_dirs):
+                    ("TEST" in d.upper()) or (d.startswith(".")) or
+                    ("apps" in d.lower()) or ("doc" in d.lower()) or
+                    (d in ignore_dirs)):
                 dirs.remove(d)
             else:
                 target_dirs.append(join(root, d))
@@ -273,7 +285,6 @@ env.ProcessFlags(env.get("BUILD_FLAGS"))
 env.Append(
     CPPPATH=[
         FRAMEWORK_DIR,
-        join(FRAMEWORK_DIR, "cmsis"),
         join(FRAMEWORK_DIR, "drivers"),
         join(FRAMEWORK_DIR, "hal"),
         join(FRAMEWORK_DIR, "hal", "storage_abstraction"),
@@ -290,12 +301,12 @@ env.Append(
 )
 
 ignore_dirs = []
-if board_type == "nrf51_dk":
+if board_type in ("nrf51_dk", "nrf51_dongle"):
     ignore_dirs = ["TARGET_MCU_NRF51822"]
-for d in ("hal", "targets", "drivers", "platform"):
+for d in ("cmsis", "hal", "targets", "drivers", "platform"):
     target_dirs = get_mbed_dirs_data(join(FRAMEWORK_DIR, d), ignore_dirs)
 
-    for inc_dir in target_dirs.get("inc_dirs", []):
+    for inc_dir in target_dirs.get("inc_dirs") + target_dirs.get("empty_dirs"):
         env.Append(CPPPATH=[inc_dir])
 
     src_filter = ["+<*.[sS]>", "+<*.c*>"]
@@ -330,20 +341,24 @@ env.Depends("$BUILD_DIR/$PROGNAME$PROGSUFFIX", linker_script)
 env.Replace(LDSCRIPT_PATH=linker_script)
 
 
-if env.get("PIOPLATFORM") == "nordicnrf51":
+if "nordicnrf5" in env.get("PIOPLATFORM"):
     env.Append(SOFTDEVICEHEX=_find_soft_device_hex(
         get_mbed_dirs_data(join(FRAMEWORK_DIR, "targets"))))
 
 mbed_libs = [
-    join(FRAMEWORK_DIR, "rtos"),
     join(FRAMEWORK_DIR, "events"),
+    join(FRAMEWORK_DIR, "features", "netsocket"),
     join(FRAMEWORK_DIR, "features", "filesystem"),
-    join(FRAMEWORK_DIR, "features", "unsupported", "net"),
+    join(FRAMEWORK_DIR, "features", "FEATURE_BLE"),
+    join(FRAMEWORK_DIR, "features", "FEATURE_LWIP", "lwip-interface"),
     join(FRAMEWORK_DIR, "features", "unsupported", "rpc"),
     join(FRAMEWORK_DIR, "features", "unsupported", "dsp"),
     join(FRAMEWORK_DIR, "features", "unsupported", "USBHost"),
     join(FRAMEWORK_DIR, "features", "unsupported", "USBDevice")
 ]
+
+if "MBED_CONF_RTOS_PRESENT" in env.get("BUILD_FLAGS", ""):
+    mbed_libs.append(join(FRAMEWORK_DIR, "rtos"))
 
 # Library processing
 
@@ -353,23 +368,40 @@ for lib_path in mbed_libs:
         "name": "mbed-" + basename(lib_path),
         "build": {
             "flags": [],
-            "srcFilter": []
+            "srcFilter": [],
+            "libArchive": False
         }
     }
 
-    target_dirs = get_mbed_dirs_data(lib_path)
+    if (basename(lib_path) == "FEATURE_BLE" and
+            env.subst("$PIOPLATFORM") == "nordicnrf51"):
+        target_dirs = get_mbed_dirs_data(lib_path, ["TARGET_MCU_NRF51822"])
+    else:
+        target_dirs = get_mbed_dirs_data(lib_path)
+
     lib_dirs = target_dirs.get("empty_dirs") + target_dirs.get(
-        "inc_dirs") + target_dirs.get("src_dirs")
+        "inc_dirs") + target_dirs.get(
+        "src_dirs") + target_dirs.get("other_dirs")
 
     for d in lib_dirs:
         if basename(lib_path) == "net" and "cellular" in d:
             continue
         rel_path = relpath(d, lib_path).replace("\\", "/")
-        lib_manifest['build']['flags'].append("-I %s" % rel_path)
+        lib_manifest['build']['flags'].extend(
+            ["-I%s" % join(FRAMEWORK_DIR, "features").replace(
+                "\\", "/"), "-I %s" % rel_path])
         lib_manifest['build']['srcFilter'].extend([
             "+<%s/*.c*>" % rel_path,
             "+<%s/*.[sS]>" % rel_path
         ])
+
+    # Handle an unusal dependencies
+    if basename(lib_path) == "netsocket":
+        for dep in ("rtos", "events"):
+            dep_dirs = get_mbed_dirs_data(join(FRAMEWORK_DIR, dep))
+            dep_includes = dep_dirs.get("inc_dirs") + dep_dirs.get("src_dirs")
+            lib_manifest['build']['flags'].extend(
+                ["-I%s" % d.replace("\\", "/") for d in dep_includes])
 
     env.Append(
         EXTRA_LIB_BUILDERS=[PlatformIOLibBuilder(env, lib_path, lib_manifest)])
