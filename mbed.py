@@ -357,7 +357,7 @@ mbed_libs = [
     join(FRAMEWORK_DIR, "features", "unsupported", "USBDevice")
 ]
 
-if "MBED_CONF_RTOS_PRESENT" in env.get("BUILD_FLAGS", ""):
+if "-DMBED_CONF_RTOS_PRESENT" in "".join(env.get("BUILD_FLAGS", "")):
     mbed_libs.append(join(FRAMEWORK_DIR, "rtos"))
 
 # Library processing
