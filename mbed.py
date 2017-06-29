@@ -45,6 +45,14 @@ env = DefaultEnvironment()
 FRAMEWORK_DIR = env.PioPlatform().get_package_dir("framework-mbed")
 assert isdir(FRAMEWORK_DIR)
 
+
+class MbedTLSLibBuilder(PlatformIOLibBuilder):
+    # For cases when sources located not ony in "src" dir
+
+    @property
+    def src_dir(self):
+        return self.path
+
 MBED_VARIANTS = {
     "blueboard_lpc11u24": "LPC11U24",
     "dipcortexm0": "LPC11U24",
@@ -342,6 +350,7 @@ mbed_libs = [
     join(FRAMEWORK_DIR, "features", "filesystem"),
     join(FRAMEWORK_DIR, "features", "FEATURE_LWIP", "lwip-interface"),
     join(FRAMEWORK_DIR, "features", "netsocket"),
+    join(FRAMEWORK_DIR, "features", "mbedtls"),
     join(FRAMEWORK_DIR, "features", "unsupported", "rpc"),
     join(FRAMEWORK_DIR, "features", "unsupported", "dsp"),
     join(FRAMEWORK_DIR, "features", "unsupported", "USBHost"),
@@ -356,7 +365,7 @@ for lib_path in mbed_libs:
         "name": "mbed-" + basename(lib_path),
         "build": {
             "flags": [],
-            "srcFilter": [],
+            "srcFilter": ["-<*>"],
             "libArchive": False
         }
     }
@@ -372,16 +381,17 @@ for lib_path in mbed_libs:
         lib_manifest['build']['flags'].extend(
             ["-I%s" % join(FRAMEWORK_DIR, "features").replace("\\", "/"), "-I %s" % rel_path])
         lib_manifest['build']['srcFilter'].extend([
-            "+<%s/*.c*>" % rel_path,
-            "+<%s/*.[sS]>" % rel_path
+            " +<%s/*.c*>" % rel_path,
+            " +<%s/*.[sS]>" % rel_path
         ])
 
-    # Handle an unusal dependency on mbed-rtos library
+    # Handle an unusal dependencies
     if basename(lib_path) == "netsocket":
-        os_dirs = get_mbed_dirs_data(join(FRAMEWORK_DIR, "rtos"))
-        os_includes = os_dirs.get("inc_dirs") + os_dirs.get("src_dirs")
-        lib_manifest['build']['flags'].extend(
-            ["-I%s" % d.replace("\\", "/") for d in os_includes])
+        for dep in ("rtos", "events"):
+            dep_dirs = get_mbed_dirs_data(join(FRAMEWORK_DIR, dep))
+            dep_includes = dep_dirs.get("inc_dirs") + dep_dirs.get("src_dirs")
+            lib_manifest['build']['flags'].extend(
+                ["-I%s" % d.replace("\\", "/") for d in dep_includes])
 
     env.Append(
-        EXTRA_LIB_BUILDERS=[PlatformIOLibBuilder(env, lib_path, lib_manifest)])
+        EXTRA_LIB_BUILDERS=[MbedTLSLibBuilder(env, lib_path, lib_manifest)])
