@@ -180,6 +180,10 @@ env.Replace(LDSCRIPT_PATH=linker_script)
 libs = mbed_config.get("libs").copy()
 libs.update(mbed_config.get("features"))
 
+if "-DPIO_FRAMEWORK_MBED_FILESYSTEM_PRESENT" in "".join(
+        env.get("BUILD_FLAGS", "")):
+    env.Append(CPPDEFINES=["MBED_CONF_FILESYSTEM_PRESENT"])
+
 # Add RTOS library only when a user requested it
 if "-DPIO_FRAMEWORK_MBED_RTOS_PRESENT" in "".join(env.get("BUILD_FLAGS", "")):
     rtos_config = mbed_config.get("libs").get("rtos")
