@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import sys
-from json import load
+import json
 from os.path import (abspath, basename, isfile, join, relpath,
                      normpath, sep)
 
@@ -83,7 +83,7 @@ class PlatformioMbedAdapter(object):
             sys.stderr.write("Could not find the file with build profiles!\n")
             sys.exit(1)
         profiles = []
-        contents = load(open(file_with_profiles))
+        contents = json.load(open(file_with_profiles))
         profiles.append(contents)
 
         return profiles

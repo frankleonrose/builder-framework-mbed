@@ -20,7 +20,7 @@ from os import makedirs, remove, walk
 from os.path import abspath, dirname, isdir, join, normpath
 from shutil import rmtree
 
-pioplus_root = dirname(abspath(__file__))
+pio_tools = dirname(abspath(__file__))
 python_exe = normpath(sys.executable)
 
 
@@ -43,7 +43,7 @@ def build_packages():
     )
 
     target_dir = join(
-        pioplus_root, "package_deps", "py%s" % sys.version_info.major)
+        pio_tools, "package_deps", "py%s" % sys.version_info.major)
     if isdir(target_dir):
         rmtree(target_dir)
     makedirs(target_dir)
