@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import sys
 import json
 from os.path import (abspath, basename, isfile, join, relpath,
@@ -35,26 +36,6 @@ def get_notifier():
     return PlatformioFakeNotifier()
 
 
-def fix_path(path):
-    # mbed build api provides the relative path (FileRef) with two
-    # redundant directories at the beginning
-    path_dirs = path[0].split(sep)[2:]
-    if not path_dirs:
-        return ""
-    return join(*path_dirs)
-
-
-def fix_paths(paths):
-    result = []
-    for path in paths:
-        path = fix_path(path)
-        if not path:
-            continue
-        result.append(path)
-
-    return result
-
-
 class PlatformioMbedAdapter(object):
     def __init__(self,
                  src_paths,
@@ -71,10 +52,33 @@ class PlatformioMbedAdapter(object):
         self.app_config = app_config
         self.ignore_dirs = ignore_dirs
         self.toolchain_name = toolchain_name
-        self.build_profile = "release"
+        self.build_profile = BUILD_PROFILE
         self.toolchain = None
         self.resources = None
         self.notify = get_notifier()
+
+    def fix_path(self, path):
+        # mbed build api provides the relative path with two
+        # redundant directories, so they are removed
+        if not path:
+            return ""
+
+        framework_dir = basename(self.framework_path)
+        if framework_dir in path:
+            fixed_path = path[path.index(framework_dir) + len(framework_dir):]
+            return fixed_path[1:]
+
+        return path
+
+    def fix_paths(self, paths):
+        result = []
+        for path in paths:
+            path = self.fix_path(path)
+            if not path:
+                continue
+            result.append(path)
+
+        return result
 
     def get_build_profile(self):
         file_with_profiles = join(self.framework_path, "tools", "profiles",
@@ -99,13 +103,12 @@ class PlatformioMbedAdapter(object):
 
     def generate_mbed_config_file(self):
         self.toolchain.get_config_header()
-        # assert isfile?
 
     def process_symbols(self, symbols):
         result = []
         for s in symbols:
             if "MBED_BUILD_TIMESTAMP" in s:
-                # Skip to avoid recompiling the entire project
+                # Skip to avoid recompilation the entire project
                 continue
             elif '"' in s and ".h" in s:
                 # for cases with includes in value like:
@@ -192,29 +195,27 @@ class PlatformioMbedAdapter(object):
             inc_dirs=inc_dirs)
 
         src_files = (
-            self.resources.get_file_refs(FileType.ASM_SRC) +
-            self.resources.get_file_refs(FileType.C_SRC) +
-            self.resources.get_file_refs(FileType.CPP_SRC)
+            self.resources.s_sources +
+            self.resources.c_sources +
+            self.resources.cpp_sources
         )
 
         if generate_config:
             self.generate_mbed_config_file()
 
         result = {
-            "src_files": fix_paths(src_files),
-            "inc_dirs": fix_paths(
-                self.resources.get_file_refs(FileType.INC_DIR)),
-            "ldscript": fix_paths(
-                self.resources.get_file_refs(FileType.LD_SCRIPT)),
+            "src_files": self.fix_paths(src_files),
+            "inc_dirs": self.fix_paths(self.resources.inc_dirs),
+            "ldscript": self.fix_paths([self.resources.linker_script]),
+            "objs": self.fix_paths(self.resources.objects),
             "build_flags": self.toolchain.flags,
-            "libs": [basename(l) for l in fix_paths(
-                self.resources.get_file_refs(FileType.LIB))],
-            "lib_paths": fix_paths(
-                self.resources.get_file_refs(FileType.LIB_DIR)),
+            "libs": [basename(l) for l in self.fix_paths(self.resources.libraries)],
+            "lib_paths": self.fix_paths(self.resources.lib_dirs),
             "syslibs": self.toolchain.sys_libs,
             "build_symbols": self.process_symbols(
                 self.toolchain.get_symbols()),
-            "hex": fix_paths(self.resources.get_file_refs(FileType.HEX))
+            "hex": self.fix_paths(self.resources.hex_files),
+            "bin": self.fix_paths(self.resources.bin_files)
         }
 
         return result

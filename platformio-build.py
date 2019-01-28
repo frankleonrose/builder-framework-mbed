@@ -185,7 +185,7 @@ env.Append(
     CXXFLAGS=configuration.get("build_flags").get("cxx"),
     LINKFLAGS=configuration.get("build_flags").get("ld"),
     CPPDEFINES=configuration.get("build_symbols"),
-    LIBS=configuration.get("syslibs") + configuration.get("libs"),
+    LIBS=configuration.get("libs") + configuration.get("syslibs"),
     CPPPATH=[FRAMEWORK_DIR, "$BUILD_DIR"]
 )
 
@@ -208,7 +208,9 @@ if "nordicnrf5" in env.get("PIOPLATFORM"):
 # Linker requires preprocessing with link flags
 #
 
-if not env.get("LDSCRIPT_PATH"):
+if not env.get("LDSCRIPT_PATH") or not isfile(
+        join(FRAMEWORK_DIR,
+             configuration.get("ldscript")[0])):
     sys.stderr.write("Cannot find linker script for current target!\n")
     env.Exit(1)
 
