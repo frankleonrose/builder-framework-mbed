@@ -16,7 +16,7 @@
 import sys
 import json
 from os.path import (abspath, basename, isfile, join, relpath,
-                     normpath, sep)
+                     normpath)
 
 from tools.build_api import (prepare_toolchain, merge_region_list,
                              UPDATE_WHITELIST)

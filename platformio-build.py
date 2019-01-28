@@ -193,7 +193,8 @@ env.Append(
     ASFLAGS=env.get("CCFLAGS", [])[:],
     CPPPATH=[process_path(configuration.get("inc_dirs"))],
     LIBPATH=[process_path(configuration.get("lib_paths"))],
-    CCFLAGS=["-include", "mbed_config.h"]
+    CCFLAGS=["-include", "mbed_config.h"],
+    LIBS=["c", "gcc"]   # Fixes linker issues in some cases
 )
 
 if "nordicnrf5" in env.get("PIOPLATFORM"):
