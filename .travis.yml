@@ -13,7 +13,7 @@ env:
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/dsp/mbed/fir_f32
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/lptmr PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/pit PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
-    - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/rtc PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
+    # - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/rtc PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/blinky PLATFORMIO_BUILD_FLAGS="-D PIO_FRAMEWORK_MBED_RTOS_PRESENT" PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f401re -b lpc1768 -b nrf52_dk"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/can PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b b96b_f446ve -b lpc1549"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/can_interrupt PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f042k6 -b lpc4088"
