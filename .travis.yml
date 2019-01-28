@@ -1,6 +1,7 @@
 language: python
 python:
     - "2.7"
+    - "3.6"
 
 env:
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/benchmarks/all PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nrf51_dk -b seeedArchPro"
@@ -13,7 +14,7 @@ env:
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/lptmr PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/pit PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/KL25Z/rtc PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z"
-    - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/blinky
+    - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/blinky PLATFORMIO_BUILD_FLAGS="-D PIO_FRAMEWORK_MBED_RTOS_PRESENT" PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f401re -b lpc1768 -b nrf52_dk"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/can PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b b96b_f446ve -b lpc1549"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/can_interrupt PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f042k6 -b lpc4088"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/mbed/dir PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b lpc1768"
@@ -35,7 +36,7 @@ env:
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/usb/device/mouse_keyboard PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f411re -b frdm_kl25z -b efm32lg_stk3600 -b lpc11u35"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/usb/device/raw_hid PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b frdm_kl25z -b efm32wg_stk3800 -b lpc1768"
     - PLATFORMIO_CI_SRC=/home/travis/.platformio/packages/framework-mbed/features/unsupported/tests/usb/device/serial PLATFORMIO_CI_BOARDS_ARGS="--project-option=framework=mbed -b nucleo_f401re -b frdm_kl25z -b efm32lg_stk3600 -b lpc11u35"
-
+    
 install:
     # Don't forget to switch to stable PlatformIO 3.0 (line below) when it will be released
     # - pip install -U platformio
@@ -48,6 +49,8 @@ install:
     - pio platform install https://github.com/platformio/platform-siliconlabsefm32.git
     - pio platform install https://github.com/platformio/platform-teensy.git
 
-
+before_script:
+    - python test_latest_framework.py
+    
 script:
     - if [[ $PLATFORMIO_CI_BOARDS_ARGS ]]; then bash -c 'platformio ci $PLATFORMIO_CI_BOARDS_ARGS'; else platformio ci --project-option=framework=mbed --board bbcmicrobit --board efm32pg_stk3401 --board nucleo_l152re --board frdm_kl46z --board samd21_xpro --board lpc11u35; fi
