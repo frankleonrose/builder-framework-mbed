@@ -39,7 +39,8 @@ def build_packages():
         "fuzzywuzzy==0.17.0",
         "future==0.17.1",
         "prettytable==0.7.2",
-        "jsonschema==2.6.0"
+        "jsonschema==2.6.0",
+        "six==1.12.0"
     )
 
     target_dir = join(
