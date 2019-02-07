@@ -119,6 +119,15 @@ def get_mbed_target(board_type):
         board_type] if board_type in variants_remap else board_type.upper()
     return variant
 
+
+def get_build_profile(cpp_defines):
+    if "MBED_BUILD_PROFILE_RELEASE" in cpp_defines:
+        return "release"
+    elif "MBED_BUILD_PROFILE_DEBUG" in cpp_defines:
+        return "debug"
+    else:
+        return "develop"
+
 #
 # Print warnings about deprecated flags
 #
@@ -153,16 +162,19 @@ if MBED_RTOS:
 if not isdir(env.subst("$BUILD_DIR")):
     makedirs(env.subst("$BUILD_DIR"))
 
-app_config = join(env.subst("$PROJECTSRC_DIR"), "mbed_app.json")
+app_config = join(env.subst("$PROJECT_DIR"), "mbed_app.json")
 if not isfile(app_config):
     app_config = None
+
+build_profile = get_build_profile(cpp_defines)
 
 framework_processor = PlatformioMbedAdapter(
     src_paths,
     env.subst("$BUILD_DIR"),
     get_mbed_target(env.subst("$BOARD")),
     FRAMEWORK_DIR,
-    app_config
+    app_config,
+    build_profile
 )
 
 try:
@@ -186,13 +198,13 @@ env.Append(
     LINKFLAGS=configuration.get("build_flags").get("ld"),
     CPPDEFINES=configuration.get("build_symbols"),
     LIBS=configuration.get("libs") + configuration.get("syslibs"),
-    CPPPATH=[FRAMEWORK_DIR, "$BUILD_DIR"]
+    CPPPATH=[FRAMEWORK_DIR, "$BUILD_DIR", "$PROJECTSRC_DIR"]
 )
 
 env.Append(
     ASFLAGS=env.get("CCFLAGS", [])[:],
-    CPPPATH=[process_path(configuration.get("inc_dirs"))],
-    LIBPATH=[process_path(configuration.get("lib_paths"))],
+    CPPPATH=process_path(configuration.get("inc_dirs")),
+    LIBPATH=process_path(configuration.get("lib_paths")),
     CCFLAGS=["-include", "mbed_config.h"],
     LIBS=["c", "gcc"]   # Fixes linker issues in some cases
 )

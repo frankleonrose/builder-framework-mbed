@@ -43,6 +43,7 @@ class PlatformioMbedAdapter(object):
                  target,
                  framework_path,
                  app_config=None,
+                 build_profile=BUILD_PROFILE,
                  ignore_dirs=None,
                  toolchain_name=TOOLCHAIN_NAME):
         self.src_paths = src_paths
@@ -52,7 +53,7 @@ class PlatformioMbedAdapter(object):
         self.app_config = app_config
         self.ignore_dirs = ignore_dirs
         self.toolchain_name = toolchain_name
-        self.build_profile = BUILD_PROFILE
+        self.build_profile = build_profile
         self.toolchain = None
         self.resources = None
         self.notify = get_notifier()
@@ -158,7 +159,6 @@ class PlatformioMbedAdapter(object):
         # Default values for mbed build api functions
         target = self.get_target_config()
         build_profile = self.get_build_profile()
-        # ToDo: delete ? notify = get_notifier()
 
         jobs = 1  # how many compilers we can run at once
         name = None  # the name of the project
