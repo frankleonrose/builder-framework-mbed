@@ -15,10 +15,11 @@
 
 import sys
 import warnings
+from shutil import copyfile
 from os import makedirs
 from os.path import basename, isdir, isfile, join
 
-from SCons.Script import Builder, DefaultEnvironment
+from SCons.Script import COMMAND_LINE_TARGETS, Builder, DefaultEnvironment
 
 from platformio import util
 from platformio.builder.tools.piolib import PlatformIOLibBuilder
@@ -63,7 +64,8 @@ def process_path(dirs):
     result = []
     for d in dirs:
         path = join(FRAMEWORK_DIR, d)
-        if "windows" in util.get_systype():
+        if ("windows" in util.get_systype()
+                and "idedata" not in COMMAND_LINE_TARGETS):
             result.append(shorten_path(path))
         else:
             result.append(path)
@@ -141,7 +143,6 @@ for f in ("PIO_FRAMEWORK_MBED_FILESYSTEM_PRESENT",
               "and/or a standalone library!" % f)
 
 src_paths = [
-    join(FRAMEWORK_DIR, "cmsis"),  # in mbed 2 only headers used
     join(FRAMEWORK_DIR, "drivers"),
     join(FRAMEWORK_DIR, "events"),
     join(FRAMEWORK_DIR, "hal"),
@@ -154,10 +155,18 @@ MBED_RTOS = "PIO_FRAMEWORK_MBED_RTOS_PRESENT" in env.Flatten(
 
 if MBED_RTOS:
     src_paths.extend([
+        join(FRAMEWORK_DIR, "cmsis"),
         join(FRAMEWORK_DIR, "components"),
         join(FRAMEWORK_DIR, "features"),
         join(FRAMEWORK_DIR, "rtos")
     ])
+
+else:
+    # in mbed 2 only cmsis headers used
+    env.Append(
+        CPPPATH=[join(FRAMEWORK_DIR, "cmsis", "TARGET_CORTEX_M")]
+    )
+
 
 if not isdir(env.subst("$BUILD_DIR")):
     makedirs(env.subst("$BUILD_DIR"))
@@ -210,12 +219,14 @@ env.Append(
 )
 
 if "nordicnrf5" in env.get("PIOPLATFORM"):
-    softdevice_hex_path = join(FRAMEWORK_DIR, configuration.get("hex")[0])
-    if softdevice_hex_path and isfile(softdevice_hex_path):
-        env.Append(SOFTDEVICEHEX=softdevice_hex_path)
-    else:
-        print("Warning! Cannot find softdevice binary"
-              "Firmware will be linked without it!")
+    has_soft_device = len(configuration.get("hex")) > 0
+    if has_soft_device:
+        softdevice_hex_path = join(FRAMEWORK_DIR, configuration.get("hex")[0])
+        if isfile(softdevice_hex_path):
+            env.Append(SOFTDEVICEHEX=softdevice_hex_path)
+        else:
+            print("Warning! Cannot find softdevice binary"
+                  "Firmware will be linked without it!")
 
 #
 # Linker requires preprocessing with link flags
@@ -263,6 +274,16 @@ def merge_firmwares(target, source, env):
         env.subst(target)[0]
     )
 
+    # some boards (e.g. nrf51 modify the resulting firmware)
+    if framework_processor.has_target_hook():
+        firmware_file = env.subst(join("$BUILD_DIR", "${PROGNAME}.hex"))
+        if not isfile(firmware_file):
+            copyfile(env.subst(source)[0], firmware_file)
+
+        framework_processor.apply_hook(
+            env.subst(join("$BUILD_DIR/$PROGNAME$PROGSUFFIX")),
+            firmware_file
+        )
 
 new_builders = env.get("BUILDERS", {})
 new_builders["MergeHex"] = Builder(action=merge_firmwares, suffix=".hex")

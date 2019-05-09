@@ -13,17 +13,21 @@
 # limitations under the License.
 
 
-import sys
 import json
+import sys
+import os
+
 from os.path import (abspath, basename, isfile, join, relpath,
                      normpath)
 
-from tools.build_api import (prepare_toolchain, merge_region_list,
-                             UPDATE_WHITELIST)
+from tools.build_api import prepare_toolchain, UPDATE_WHITELIST
+
+from tools.regions import merge_region_list
 from tools.targets import TARGET_MAP
 from tools.utils import generate_update_filename
-from tools.resources import FileType, Resources
+
 from pio_mock_notifier import PlatformioFakeNotifier
+from pio_resources_fixed_path import MbedResourcesFixedPath
 
 # A handy global as PlatformIO supports only GCC toolchain
 TOOLCHAIN_NAME = "GCC_ARM"
@@ -57,29 +61,6 @@ class PlatformioMbedAdapter(object):
         self.toolchain = None
         self.resources = None
         self.notify = get_notifier()
-
-    def fix_path(self, path):
-        # mbed build api provides the relative path with two
-        # redundant directories, so they are removed
-        if not path:
-            return ""
-
-        framework_dir = basename(self.framework_path)
-        if framework_dir in path:
-            fixed_path = path[path.index(framework_dir) + len(framework_dir):]
-            return fixed_path[1:]
-
-        return path
-
-    def fix_paths(self, paths):
-        result = []
-        for path in paths:
-            path = self.fix_path(path)
-            if not path:
-                continue
-            result.append(path)
-
-        return result
 
     def get_build_profile(self):
         file_with_profiles = join(self.framework_path, "tools", "profiles",
@@ -132,7 +113,8 @@ class PlatformioMbedAdapter(object):
                 r._replace(filename=userprog_path) if r.active else r for r in region_list
             ]
 
-            merge_region_list(region_list, firmware_path, self.notify)
+            merge_region_list(
+                region_list, firmware_path, self.notify, self.toolchain.config)
             update_regions = [
                 r for r in region_list if r.name in UPDATE_WHITELIST]
 
@@ -141,7 +123,8 @@ class PlatformioMbedAdapter(object):
                     self.build_path,
                     generate_update_filename(
                         firmware_path, self.toolchain.target))
-                merge_region_list(update_regions, update_res, self.notify)
+                merge_region_list(
+                    update_regions, update_res, self.notify, self.toolchain.config)
                 firmware_path = (firmware_path, update_res)
             else:
                 firmware_path = (firmware_path, None)
@@ -168,6 +151,11 @@ class PlatformioMbedAdapter(object):
         ignore = self.ignore_dirs  # list of paths to add to mbedignore
         clean = False  # Rebuild everything if True
 
+        # For cases when project and framework are on different
+        # logic drives (Windows only)
+        backup_cwd = os.getcwd()
+        os.chdir(self.framework_path)
+
         # Convert src_path to a list if needed
         if not isinstance(self.src_paths, list):
             self.src_paths = [self.src_paths]
@@ -190,7 +178,7 @@ class PlatformioMbedAdapter(object):
         #         error_msg = "The library src folder doesn't exist:%s", src_path
         #         raise Exception(error_msg)
 
-        self.resources = Resources(self.notify).scan_with_toolchain(
+        self.resources = MbedResourcesFixedPath(self.framework_path, self.notify).scan_with_toolchain(
             self.src_paths, self.toolchain, dependencies_paths,
             inc_dirs=inc_dirs)
 
@@ -203,19 +191,42 @@ class PlatformioMbedAdapter(object):
         if generate_config:
             self.generate_mbed_config_file()
 
+        # Revert back project cwd
+        os.chdir(backup_cwd)
+
         result = {
-            "src_files": self.fix_paths(src_files),
-            "inc_dirs": self.fix_paths(self.resources.inc_dirs),
-            "ldscript": self.fix_paths([self.resources.linker_script]),
-            "objs": self.fix_paths(self.resources.objects),
+            "src_files": src_files,
+            "inc_dirs": self.resources.inc_dirs,
+            "ldscript": [self.resources.linker_script],
+            "objs": self.resources.objects,
             "build_flags": self.toolchain.flags,
-            "libs": [basename(l) for l in self.fix_paths(self.resources.libraries)],
-            "lib_paths": self.fix_paths(self.resources.lib_dirs),
+            "libs": [basename(l) for l in self.resources.libraries],
+            "lib_paths": self.resources.lib_dirs,
             "syslibs": self.toolchain.sys_libs,
             "build_symbols": self.process_symbols(
                 self.toolchain.get_symbols()),
-            "hex": self.fix_paths(self.resources.hex_files),
-            "bin": self.fix_paths(self.resources.bin_files)
+            "hex": self.resources.hex_files,
+            "bin": self.resources.bin_files
         }
 
         return result
+
+    def has_target_hook(self):
+        return hasattr(self.toolchain.target, "post_binary_hook")
+
+    def get_target_hook(self):
+        if hasattr(self.toolchain.target, "post_binary_hook"):
+            mdata = self.toolchain.target.get_module_data()
+            hook_data = self.toolchain.target.post_binary_hook
+            class_name, hook = hook_data["function"].split(".")
+            cls = mdata[class_name]
+            # hook is a function with the next signature:
+            # def (toolchain, resources, path_elf, path_bin_or_hex)
+            return getattr(cls, hook)
+        else:
+            return None
+
+    def apply_hook(self, elf_path, firmware_path):
+        hook = self.get_target_hook()
+        if hook:
+            hook(self.toolchain, self.resources, elf_path, firmware_path)
